@@ -3,7 +3,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 import logging
 
 # --- Config ---
-TOKEN = '7251000212:AAEUSyB5neq8ExrfBmB6P6K-kTHRpAte8DU'  # 🔒 Replace this safely
+TOKEN = 'os.getenv("TOKEN")'  # 🔒 Replace this safely
 CHANNEL_USERNAME = '@slmemess'
 ADMIN_IDS = [6715620197, 5183908956, 5753055464, 6451758507]
 ADMIN_GROUP_ID = -1002168714304  # Admins-only group
