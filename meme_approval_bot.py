@@ -2,6 +2,8 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 import logging
+from flask import Flask
+from threading import Thread
 
 # --- Config ---
 TOKEN = os.getenv("Token")  # 🔒 Replace this safely
@@ -12,6 +14,34 @@ ADMIN_GROUP_ID = -1002168714304  # Admins-only group
 # --- Setup ---
 logging.basicConfig(level=logging.INFO)
 pending_memes = {}  # message_id: data
+
+# --- Telegram Bot Logic ---
+updater = Updater(token=TOKEN, use_context=True)
+dispatcher = updater.dispatcher
+
+# Example command handler
+def start(update, context):
+    update.message.reply_text("Hello! Welcome to the Meme Approval Bot.")
+dispatcher.add_handler(CommandHandler("start", start))
+
+def run_bot():
+    updater.start_polling()
+    updater.idle()
+
+# Run bot in a separate thread
+bot_thread = Thread(target=run_bot)
+bot_thread.start()
+
+# --- Flask Web Server ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+if __name__ == '__main__':
+    port = int(os.getenv("PORT", 5000))  # Default port is 5000
+    app.run(host='0.0.0.0', port=port)
 
 
 def start(update: Update, context: CallbackContext):
