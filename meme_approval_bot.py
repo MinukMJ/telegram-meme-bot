@@ -1,5 +1,4 @@
-Certainly! I'll rewrite your code to use the long polling method instead of a webhook. Long polling retrieves updates directly from Telegram's servers by periodically checking for new messages, so you won't need Flask or a webhook.
-Here’s your updated code with the necessary changes applied:
+
 import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
@@ -129,17 +128,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-
-Key Changes:
-- Removed Flask & Webhook:- Removed all Flask-related code, along with bot.set_webhook and bot.delete_webhook.
-
-- Integrated Long Polling:- Used the Updater from telegram.ext to poll Telegram's servers for updates using updater.start_polling().
-
-- Simplified Setup:- No external server is needed. The bot will directly handle updates using long polling.
-
-
-Deployment Tips:
-- Run the bot on a system that stays online (e.g., a VPS or local system with a screen session).
-- Ensure that your environment variables (Token) are properly set.
-
-Let me know if you need any further assistance or customizations! 😊
