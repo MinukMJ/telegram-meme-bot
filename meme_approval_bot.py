@@ -1,32 +1,39 @@
 import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
-from flask import Flask
-from threading import Thread
+from telegram.ext import (
+    Updater, CommandHandler, MessageHandler, Filters,
+    CallbackContext, CallbackQueryHandler
+)
+from flask import Flask, request
+import telegram
 
 # --- Config ---
 TOKEN = os.getenv("Token")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # e.g., https://your-app-name.onrender.com
 CHANNEL_USERNAME = '@slmemess'
 ADMIN_IDS = [6715620197, 5183908956, 5753055464, 6451758507]
 ADMIN_GROUP_ID = -1002168714304
 
 # --- Setup ---
-logging.basicConfig(level=logging.INFO)
+bot = telegram.Bot(token=TOKEN)
 pending_memes = {}
+logging.basicConfig(level=logging.INFO)
 
-# --- Flask Server ---
+# --- Flask App ---
 app = Flask(__name__)
 
 @app.route('/')
-def home():
-    return "Bot is running!"
+def index():
+    return "Bot is up and running!"
 
-def run_flask():
-    port = int(os.getenv("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+@app.route(f'/{TOKEN}', methods=['POST'])
+def webhook():
+    update = telegram.Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return 'ok'
 
-# --- Telegram Handlers ---
+# --- Handlers ---
 def start(update: Update, context: CallbackContext):
     update.message.reply_text("👋 Welcome to Memegram Post bot! Send me a meme (photo/video) to post in the channel.")
 
@@ -47,25 +54,16 @@ def handle_submission(update: Update, context: CallbackContext):
         "caption": caption,
         "media_type": media_type,
         "user_id": user.id,
-        "user_id": user.id
     }
 
     placeholder_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⏳ Pending...", callback_data="pending")]])
 
+    admin_caption = f"🆕 Meme from ID: {user.id}\n\n📎 Caption: {caption}"
+
     if media_type == "photo":
-        sent = context.bot.send_photo(
-            chat_id=ADMIN_GROUP_ID,
-            photo=file_id,
-            caption=f"🆕 Meme from ID: {user.id}\n\n📎 Caption: {caption}",
-            reply_markup=placeholder_keyboard
-        )
+        sent = context.bot.send_photo(chat_id=ADMIN_GROUP_ID, photo=file_id, caption=admin_caption, reply_markup=placeholder_keyboard)
     else:
-        sent = context.bot.send_video(
-            chat_id=ADMIN_GROUP_ID,
-            video=file_id,
-            caption=f"🆕 Meme from ID: {user.id}\n\n📎 Caption: {caption}",
-            reply_markup=placeholder_keyboard
-        )
+        sent = context.bot.send_video(chat_id=ADMIN_GROUP_ID, video=file_id, caption=admin_caption, reply_markup=placeholder_keyboard)
 
     if sent:
         msg_id_str = str(sent.message_id)
@@ -102,12 +100,10 @@ def handle_callback(update: Update, context: CallbackContext):
 
     file_id = meme_data["file_id"]
     media_type = meme_data["media_type"]
-    user_id = meme_data.get("user_id", "")
+    admin_name = query.from_user.first_name or "Admin"
+    credit = f"✅ Approved by {admin_name}"
 
     if action == "approve":
-        admin_name = query.from_user.first_name or ""
-        credit = f"✅ Approved by {admin_name}"
-
         if media_type == "photo":
             context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=file_id, caption=credit)
         else:
@@ -122,21 +118,19 @@ def handle_callback(update: Update, context: CallbackContext):
 
 # --- Main ---
 def main():
+    global dispatcher
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
+    dispatcher = dp  # Needed to call from Flask
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.photo | Filters.video, handle_submission))
     dp.add_handler(CallbackQueryHandler(handle_callback))
 
-    updater.start_polling()
-    updater.idle()
-
+    # Set webhook for Telegram
+    bot.set_webhook(f"{WEBHOOK_URL}/{TOKEN}")
 
 if __name__ == '__main__':
-    # Start bot in background
-    Thread(target=main).start()
-    
-    # Start Flask web server
+    main()
     port = int(os.getenv("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
