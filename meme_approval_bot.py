@@ -1,8 +1,8 @@
 import os
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
-    Updater, CommandHandler, MessageHandler, Filters,
+    Dispatcher, CommandHandler, MessageHandler, Filters,
     CallbackContext, CallbackQueryHandler
 )
 from flask import Flask, request
@@ -16,7 +16,7 @@ ADMIN_IDS = [6715620197, 5183908956, 5753055464, 6451758507]
 ADMIN_GROUP_ID = -1002168714304
 
 # --- Setup ---
-bot = telegram.Bot(token=TOKEN)
+bot = Bot(token=TOKEN)
 pending_memes = {}
 logging.basicConfig(level=logging.INFO)
 
@@ -119,15 +119,16 @@ def handle_callback(update: Update, context: CallbackContext):
 # --- Main ---
 def main():
     global dispatcher
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dispatcher = dp  # Needed to call from Flask
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.photo | Filters.video, handle_submission))
-    dp.add_handler(CallbackQueryHandler(handle_callback))
+    from telegram.ext import CallbackContext
+    dispatcher = Dispatcher(bot, None, workers=4, use_context=True)
 
-    # Set webhook for Telegram
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(Filters.photo | Filters.video, handle_submission))
+    dispatcher.add_handler(CallbackQueryHandler(handle_callback))
+
+    # Set webhook
+    bot.delete_webhook()  # Optional cleanup
     bot.set_webhook(f"{WEBHOOK_URL}/{TOKEN}")
 
 if __name__ == '__main__':
