@@ -1,52 +1,34 @@
 import os
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
-import logging
 from flask import Flask
 from threading import Thread
 
 # --- Config ---
-TOKEN = os.getenv("Token")  # 🔒 Replace this safely
+TOKEN = os.getenv("Token")
 CHANNEL_USERNAME = '@slmemess'
 ADMIN_IDS = [6715620197, 5183908956, 5753055464, 6451758507]
-ADMIN_GROUP_ID = -1002168714304  # Admins-only group
+ADMIN_GROUP_ID = -1002168714304
 
 # --- Setup ---
 logging.basicConfig(level=logging.INFO)
-pending_memes = {}  # message_id: data
+pending_memes = {}
 
-# --- Telegram Bot Logic ---
-updater = Updater(token=TOKEN, use_context=True)
-dispatcher = updater.dispatcher
-
-# Example command handler
-def start(update, context):
-    update.message.reply_text("Hello! Welcome to the Meme Approval Bot.")
-dispatcher.add_handler(CommandHandler("start", start))
-
-def run_bot():
-    updater.start_polling()
-    updater.idle()
-
-# Run bot in a separate thread
-bot_thread = Thread(target=run_bot)
-bot_thread.start()
-
-# --- Flask Web Server ---
+# --- Flask Server ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Bot is running!"
 
-if __name__ == '__main__':
-    port = int(os.getenv("PORT", 5000))  # Default port is 5000
+def run_flask():
+    port = int(os.getenv("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
 
-
+# --- Telegram Handlers ---
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("👋 Welcome! Send me a meme (photo/video) to submit for approval.")
-
+    update.message.reply_text("👋 Welcome to Memegram Post bot! Send me a meme (photo/video) to post in the channel.")
 
 def handle_submission(update: Update, context: CallbackContext):
     user = update.effective_user
@@ -68,12 +50,8 @@ def handle_submission(update: Update, context: CallbackContext):
         "username": user.username or user.full_name,
     }
 
-    # Placeholder buttons
-    placeholder_keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⏳ Pending...", callback_data="pending")
-    ]])
+    placeholder_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⏳ Pending...", callback_data="pending")]])
 
-    # Send to admin group
     if media_type == "photo":
         sent = context.bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
@@ -93,22 +71,20 @@ def handle_submission(update: Update, context: CallbackContext):
         msg_id_str = str(sent.message_id)
         pending_memes[msg_id_str] = submission_data
 
-        # Now set the actual buttons with valid callback_data
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("✅ Approve", callback_data=f"approve|{msg_id_str}"),
-            InlineKeyboardButton("❌ Reject", callback_data=f"reject|{msg_id_str}")
-        ]])
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Approve", callback_data=f"approve|{msg_id_str}"),
+                InlineKeyboardButton("❌ Reject", callback_data=f"reject|{msg_id_str}")
+            ]
+        ])
         sent.edit_reply_markup(reply_markup=keyboard)
-
         message.reply_text("✅ Your meme has been submitted for review.")
-
 
 def handle_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     data = query.data.split("|")
     action = data[0]
 
-    # Only admins can approve/reject
     if query.from_user.id not in ADMIN_IDS:
         query.answer("❌ You are not authorized.")
         return
@@ -142,18 +118,22 @@ def handle_callback(update: Update, context: CallbackContext):
         query.edit_message_caption("❌ Rejected by admin.")
         query.answer("⛔ Rejected.")
 
-
+# --- Main ---
 def main():
-    updater = Updater(TOKEN)
+    updater = Updater(token=TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.photo | Filters.video, handle_submission))
     dp.add_handler(CallbackQueryHandler(handle_callback))
 
+    # Run Flask in background
+    flask_thread = Thread(target=run_flask)
+    flask_thread.start()
+
+    # Run bot in main thread
     updater.start_polling()
     updater.idle()
-
 
 if __name__ == '__main__':
     main()
