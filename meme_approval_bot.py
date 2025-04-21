@@ -1,16 +1,15 @@
+Certainly! I'll rewrite your code to use the long polling method instead of a webhook. Long polling retrieves updates directly from Telegram's servers by periodically checking for new messages, so you won't need Flask or a webhook.
+Here’s your updated code with the necessary changes applied:
 import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
-    Dispatcher, CommandHandler, MessageHandler, Filters,
-    CallbackContext, CallbackQueryHandler
+    Updater, CommandHandler, MessageHandler, CallbackContext,
+    CallbackQueryHandler, Filters
 )
-from flask import Flask, request
-import telegram
 
 # --- Config ---
 TOKEN = os.getenv("Token")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # e.g., https://your-app-name.onrender.com
 CHANNEL_USERNAME = '@slmemess'
 ADMIN_IDS = [6715620197, 5183908956, 5753055464, 6451758507]
 ADMIN_GROUP_ID = -1002168714304
@@ -20,22 +19,11 @@ bot = Bot(token=TOKEN)
 pending_memes = {}
 logging.basicConfig(level=logging.INFO)
 
-# --- Flask App ---
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return "Bot is up and running!"
-
-@app.route(f'/{TOKEN}', methods=['POST'])
-def webhook():
-    update = telegram.Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
-    return 'ok'
-
 # --- Handlers ---
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("👋 Welcome to Memegram Post bot! Send me a meme (photo/video) to post in the channel.")
+    update.message.reply_text(
+        "👋 Welcome to Memegram Post bot! Send me a meme (photo/video) to post in the channel."
+    )
 
 def handle_submission(update: Update, context: CallbackContext):
     user = update.effective_user
@@ -56,14 +44,22 @@ def handle_submission(update: Update, context: CallbackContext):
         "user_id": user.id,
     }
 
-    placeholder_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⏳ Pending...", callback_data="pending")]])
+    placeholder_keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("⏳ Pending...", callback_data="pending")]]
+    )
 
     admin_caption = f"🆕 Meme from ID: {user.id}\n\n📎 Caption: {caption}"
 
     if media_type == "photo":
-        sent = context.bot.send_photo(chat_id=ADMIN_GROUP_ID, photo=file_id, caption=admin_caption, reply_markup=placeholder_keyboard)
+        sent = context.bot.send_photo(
+            chat_id=ADMIN_GROUP_ID, photo=file_id,
+            caption=admin_caption, reply_markup=placeholder_keyboard
+        )
     else:
-        sent = context.bot.send_video(chat_id=ADMIN_GROUP_ID, video=file_id, caption=admin_caption, reply_markup=placeholder_keyboard)
+        sent = context.bot.send_video(
+            chat_id=ADMIN_GROUP_ID, video=file_id,
+            caption=admin_caption, reply_markup=placeholder_keyboard
+        )
 
     if sent:
         msg_id_str = str(sent.message_id)
@@ -118,20 +114,32 @@ def handle_callback(update: Update, context: CallbackContext):
 
 # --- Main ---
 def main():
-    global dispatcher
-
-    from telegram.ext import CallbackContext
-    dispatcher = Dispatcher(bot, None, workers=4, use_context=True)
+    updater = Updater(TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(MessageHandler(Filters.photo | Filters.video, handle_submission))
     dispatcher.add_handler(CallbackQueryHandler(handle_callback))
 
-    # Set webhook
-    bot.delete_webhook()  # Optional cleanup
-    bot.set_webhook(f"{WEBHOOK_URL}/{TOKEN}")
+    # Start the bot with polling
+    logging.info("Bot is starting with long polling...")
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main()
-    port = int(os.getenv("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+
+
+Key Changes:
+- Removed Flask & Webhook:- Removed all Flask-related code, along with bot.set_webhook and bot.delete_webhook.
+
+- Integrated Long Polling:- Used the Updater from telegram.ext to poll Telegram's servers for updates using updater.start_polling().
+
+- Simplified Setup:- No external server is needed. The bot will directly handle updates using long polling.
+
+
+Deployment Tips:
+- Run the bot on a system that stays online (e.g., a VPS or local system with a screen session).
+- Ensure that your environment variables (Token) are properly set.
+
+Let me know if you need any further assistance or customizations! 😊
