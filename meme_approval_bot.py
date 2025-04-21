@@ -120,20 +120,21 @@ def handle_callback(update: Update, context: CallbackContext):
 
 # --- Main ---
 def main():
-    updater = Updater(token=TOKEN, use_context=True)
+    updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.photo | Filters.video, handle_submission))
     dp.add_handler(CallbackQueryHandler(handle_callback))
 
-    # Run Flask in background
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
-
-    # Run bot in main thread
     updater.start_polling()
     updater.idle()
 
+
 if __name__ == '__main__':
-    main()
+    # Start bot in background
+    Thread(target=main).start()
+    
+    # Start Flask web server
+    port = int(os.getenv("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
