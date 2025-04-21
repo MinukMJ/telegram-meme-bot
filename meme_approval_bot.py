@@ -47,7 +47,7 @@ def handle_submission(update: Update, context: CallbackContext):
         "caption": caption,
         "media_type": media_type,
         "user_id": user.id,
-        "username": user.username or user.full_name,
+        "user_id": user.id
     }
 
     placeholder_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("⏳ Pending...", callback_data="pending")]])
@@ -56,14 +56,14 @@ def handle_submission(update: Update, context: CallbackContext):
         sent = context.bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
             photo=file_id,
-            caption=f"🆕 Meme from @{submission_data['username']} (ID: {user.id})\n\n📎 Caption: {caption}",
+            caption=f"🆕 Meme from ID: {user.id}\n\n📎 Caption: {caption}",
             reply_markup=placeholder_keyboard
         )
     else:
         sent = context.bot.send_video(
             chat_id=ADMIN_GROUP_ID,
             video=file_id,
-            caption=f"🆕 Meme from @{submission_data['username']} (ID: {user.id})\n\n📎 Caption: {caption}",
+            caption=f"🆕 Meme from ID: {user.id}\n\n📎 Caption: {caption}",
             reply_markup=placeholder_keyboard
         )
 
@@ -102,10 +102,12 @@ def handle_callback(update: Update, context: CallbackContext):
 
     file_id = meme_data["file_id"]
     media_type = meme_data["media_type"]
-    username = meme_data["username"]
+    user_id = meme_data.get("user_id", "")
 
     if action == "approve":
-        credit = f"📩 Sent by @{username} — thanks for the meme!"
+        admin_name = query.from_user.first_name or ""
+        credit = f"✅ Approved by {admin_name}"
+
         if media_type == "photo":
             context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=file_id, caption=credit)
         else:
